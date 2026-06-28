@@ -1,5 +1,7 @@
 # Fake News Detector
 
+Demo: https://fake-news-demo.streamlit.app/
+
 An explainable web application that classifies news text as **Fake** or **Real** using TF-IDF machine learning models, LIME explanations, and statistical writing-style analysis.
 
 ## Features
