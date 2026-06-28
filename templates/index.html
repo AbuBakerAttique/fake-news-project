@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fake News Detector</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/wordcloud2.js/1.0.2/wordcloud2.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <div class="logo">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 12l2 2 4-4"/>
+                        <path d="M12 3c7.2 0 9 1.8 9 9s-1.8 9-9 9-9-1.8-9-9 1.8-9 9-9z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1>Fake News Detector</h1>
+                    <p class="subtitle">Explainable AI-Powered News Verification &middot; TF-IDF Classifiers + Statistical Analysis + LIME</p>
+                </div>
+            </div>
+        </header>
+
+        <main>
+            <section class="input-section">
+                <div class="card">
+                    <h2>Analyze News Article</h2>
+                    <p class="card-desc">Paste a news article below. The system runs three ML classifiers (TF-IDF) plus statistical text analysis for writing-style signals.</p>
+
+                    <div class="form-group">
+                        <label for="newsText">Article Text</label>
+                        <textarea id="newsText" rows="8" placeholder="Paste the full news article text here..."></textarea>
+                        <div class="char-count"><span id="charCount">0</span> characters</div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="modelSelect">Primary TF-IDF Model</label>
+                            <select id="modelSelect">
+                                {% for model in models %}
+                                <option value="{{ model }}" {% if loop.first %}selected{% endif %}>{{ model }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <button id="analyzeBtn" onclick="analyze()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                            </svg>
+                            Analyze Article
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <div id="loading" class="loading hidden">
+                <div class="spinner"></div>
+                <p>Running TF-IDF classifiers + statistical analysis + generating LIME explanations...</p>
+            </div>
+
+            <section id="results" class="results-section hidden">
+
+                <!-- Combined Verdict (top-level) -->
+                <div class="verdict-card" id="combinedVerdictCard">
+                    <div class="verdict-header">
+                        <div class="verdict-icon" id="combinedVerdictIcon"></div>
+                        <div>
+                            <div class="verdict-overline">COMBINED VERDICT</div>
+                            <div class="verdict-label" id="combinedVerdictLabel"></div>
+                            <div class="verdict-confidence" id="combinedVerdictConf"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI Detection Card -->
+                <div class="card ai-card" id="aiDetectionCard">
+                    <div class="ai-card-header">
+                        <div>
+                            <h3>AI-Generated Text Detection</h3>
+                            <p class="card-desc">Statistical text pattern analysis (sentence uniformity, vocabulary, formality, etc.)</p>
+                        </div>
+                        <div class="ai-badge" id="aiBadge"></div>
+                    </div>
+                    <div class="ai-meter-container">
+                        <div class="ai-meter-labels">
+                            <span>Human-Written</span>
+                            <span>AI-Generated</span>
+                        </div>
+                        <div class="ai-meter-track">
+                            <div class="ai-meter-fill" id="aiMeterFill" style="width: 0%"></div>
+                            <div class="ai-meter-thumb" id="aiMeterThumb" style="left: 0%"></div>
+                        </div>
+                        <div class="ai-meter-values">
+                            <span id="humanProbVal">0%</span>
+                            <span id="aiProbVal">0%</span>
+                        </div>
+                    </div>
+                    <div id="aiStatsBreakdown" class="ai-stats-breakdown hidden"></div>
+                </div>
+
+                <!-- TF-IDF Primary Model Result -->
+                <div class="verdict-card verdict-secondary" id="verdictCard">
+                    <div class="verdict-header">
+                        <div class="verdict-icon" id="verdictIcon"></div>
+                        <div>
+                            <div class="verdict-overline">TF-IDF CLASSIFIER</div>
+                            <div class="verdict-label" id="verdictLabel"></div>
+                            <div class="verdict-confidence" id="verdictConfidence"></div>
+                        </div>
+                    </div>
+                    <div class="probability-bars">
+                        <div class="prob-bar">
+                            <div class="prob-label">
+                                <span>Fake</span>
+                                <span id="fakeProb">0%</span>
+                            </div>
+                            <div class="bar-track">
+                                <div class="bar-fill fake" id="fakeBar" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="prob-bar">
+                            <div class="prob-label">
+                                <span>Real</span>
+                                <span id="realProb">0%</span>
+                            </div>
+                            <div class="bar-track">
+                                <div class="bar-fill real" id="realBar" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div class="card">
+                        <h3>TF-IDF Ensemble</h3>
+                        <p class="card-desc">Majority vote from all three classifiers</p>
+                        <div class="ensemble-result" id="ensembleResult"></div>
+                        <div class="model-votes" id="modelVotes"></div>
+                    </div>
+
+                    <div class="card">
+                        <h3>Model Comparison</h3>
+                        <p class="card-desc">Individual classifier predictions</p>
+                        <div id="modelComparison"></div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>LIME Explanation</h3>
+                    <p class="card-desc">Words that most influenced the TF-IDF model's decision. <strong style="color: var(--danger);">Red</strong> = pushes toward Fake, <strong style="color: var(--success);">green</strong> = pushes toward Real.</p>
+                    <div class="lime-chart" id="limeChart"></div>
+                </div>
+
+                <div class="card wordcloud-card">
+                    <h3>Word Cloud — Fake vs Real</h3>
+                    <p class="card-desc">Same LIME weights as above: word size = influence strength. Left: words that push the model toward <strong style="color: var(--danger);">Fake</strong>. Right: words that push toward <strong style="color: var(--success);">Real</strong>.</p>
+                    <div class="wordcloud-row">
+                        <div class="wordcloud-box">
+                            <div class="wordcloud-label fake-label">Words suggesting Fake</div>
+                            <div id="wordcloudFake" class="wordcloud-container"></div>
+                        </div>
+                        <div class="wordcloud-box">
+                            <div class="wordcloud-label real-label">Words suggesting Real</div>
+                            <div id="wordcloudReal" class="wordcloud-container"></div>
+                        </div>
+                    </div>
+                </div>
+
+                {% if results %}
+                <div class="card">
+                    <h3>Model Performance (Test Set)</h3>
+                    <p class="card-desc">Evaluation metrics from training on the Fake & Real News dataset</p>
+                    <div class="metrics-table-wrapper">
+                        <table class="metrics-table">
+                            <thead>
+                                <tr>
+                                    <th>Model</th>
+                                    <th>Accuracy</th>
+                                    <th>Precision</th>
+                                    <th>Recall</th>
+                                    <th>F1-Score</th>
+                                    <th>ROC-AUC</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for model, metrics in results.items() %}
+                                <tr>
+                                    <td><strong>{{ model }}</strong></td>
+                                    <td>{{ metrics.accuracy }}</td>
+                                    <td>{{ metrics.precision }}</td>
+                                    <td>{{ metrics.recall }}</td>
+                                    <td>{{ metrics.f1_score }}</td>
+                                    <td>{{ metrics.roc_auc }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
+            </section>
+        </main>
+
+        <footer>
+            <p>Fake News Detection System &mdash; TF-IDF + Statistical Analysis + LIME Explainability</p>
+        </footer>
+    </div>
+
+    <script>
+        const textarea = document.getElementById('newsText');
+        const charCount = document.getElementById('charCount');
+        textarea.addEventListener('input', () => {
+            charCount.textContent = textarea.value.length;
+        });
+
+        async function analyze() {
+            const text = textarea.value.trim();
+            const model = document.getElementById('modelSelect').value;
+
+            if (!text) {
+                alert('Please enter some text to analyze.');
+                return;
+            }
+
+            if (text.length < 50) {
+                alert('Please enter a longer article (at least 50 characters) for reliable analysis.');
+                return;
+            }
+
+            const btn = document.getElementById('analyzeBtn');
+            const loading = document.getElementById('loading');
+            const results = document.getElementById('results');
+
+            btn.disabled = true;
+            btn.textContent = 'Analyzing...';
+            loading.classList.remove('hidden');
+            results.classList.add('hidden');
+
+            try {
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text, model })
+                });
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.error || 'Analysis failed');
+                }
+
+                const data = await response.json();
+                displayResults(data);
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg> Analyze Article`;
+                loading.classList.add('hidden');
+            }
+        }
+
+        function displayResults(data) {
+            const results = document.getElementById('results');
+            results.classList.remove('hidden');
+
+            // ── Combined Verdict ──
+            const cv = data.combined_verdict;
+            const cvCard = document.getElementById('combinedVerdictCard');
+            const cvIsFake = cv.label === 'Fake';
+            cvCard.className = `verdict-card ${cvIsFake ? 'verdict-fake' : 'verdict-real'}`;
+
+            document.getElementById('combinedVerdictIcon').innerHTML = cvIsFake
+                ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg>'
+                : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/></svg>';
+
+            document.getElementById('combinedVerdictLabel').textContent =
+                cvIsFake ? 'Likely FAKE News' : 'Likely REAL News';
+
+            let cvDesc = `${cv.confidence}% confidence`;
+            if (data.ai_detection && data.ai_detection.is_ai_generated) {
+                cvDesc += ' · AI-generated text detected';
+            }
+            document.getElementById('combinedVerdictConf').textContent = cvDesc;
+
+            // ── AI Detection ──
+            const aiCard = document.getElementById('aiDetectionCard');
+            if (data.ai_detection) {
+                aiCard.classList.remove('hidden');
+                const ai = data.ai_detection;
+                const aiBadge = document.getElementById('aiBadge');
+
+                if (ai.is_ai_generated) {
+                    aiBadge.className = 'ai-badge ai-badge-detected';
+                    aiBadge.textContent = 'AI DETECTED';
+                    aiCard.classList.add('ai-detected');
+                    aiCard.classList.remove('ai-human');
+                } else {
+                    aiBadge.className = 'ai-badge ai-badge-human';
+                    aiBadge.textContent = 'HUMAN';
+                    aiCard.classList.add('ai-human');
+                    aiCard.classList.remove('ai-detected');
+                }
+
+                document.getElementById('humanProbVal').textContent = ai.human_prob + '%';
+                document.getElementById('aiProbVal').textContent = ai.ai_prob + '%';
+
+                setTimeout(() => {
+                    document.getElementById('aiMeterFill').style.width = ai.ai_prob + '%';
+                    document.getElementById('aiMeterThumb').style.left = ai.ai_prob + '%';
+                }, 100);
+
+                // Statistical breakdown
+                const statsEl = document.getElementById('aiStatsBreakdown');
+                if (ai.statistical && ai.statistical.features) {
+                    const featureLabels = {
+                        sentence_uniformity: 'Sentence Uniformity',
+                        vocabulary_pattern: 'Vocabulary Pattern',
+                        no_contractions: 'No Contractions',
+                        formality: 'Formality Level',
+                        low_burstiness: 'Low Burstiness',
+                        transition_density: 'Transition Words',
+                        structural_regularity: 'Structural Regularity',
+                    };
+                    let html = '<div class="stats-title">Statistical Indicators</div><div class="stats-grid">';
+                    for (const [key, val] of Object.entries(ai.statistical.features)) {
+                        const pct = Math.round(val * 100);
+                        const lbl = featureLabels[key] || key;
+                        const cls = pct >= 50 ? 'stat-warn' : 'stat-ok';
+                        html += `<div class="stat-item">
+                            <div class="stat-label">${lbl}</div>
+                            <div class="stat-bar-track"><div class="stat-bar-fill ${cls}" style="width:${pct}%"></div></div>
+                            <div class="stat-val">${pct}%</div>
+                        </div>`;
+                    }
+                    html += '</div>';
+                    statsEl.innerHTML = html;
+                    statsEl.classList.remove('hidden');
+                } else {
+                    statsEl.classList.add('hidden');
+                }
+            } else {
+                aiCard.classList.add('hidden');
+            }
+
+            // ── TF-IDF Primary Model ──
+            const verdictCard = document.getElementById('verdictCard');
+            const isFake = data.label === 'Fake';
+            verdictCard.className = `verdict-card verdict-secondary ${isFake ? 'verdict-fake' : 'verdict-real'}`;
+
+            document.getElementById('verdictIcon').innerHTML = isFake
+                ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>'
+                : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>';
+
+            document.getElementById('verdictLabel').textContent =
+                isFake ? 'FAKE' : 'REAL';
+            document.getElementById('verdictConfidence').textContent =
+                `${data.confidence}% confidence — ${data.model}`;
+
+            document.getElementById('fakeProb').textContent = data.fake_probability + '%';
+            document.getElementById('realProb').textContent = data.real_probability + '%';
+            setTimeout(() => {
+                document.getElementById('fakeBar').style.width = data.fake_probability + '%';
+                document.getElementById('realBar').style.width = data.real_probability + '%';
+            }, 100);
+
+            // ── TF-IDF Ensemble ──
+            const ensembleEl = document.getElementById('ensembleResult');
+            const ensIsFake = data.ensemble.label === 'Fake';
+            ensembleEl.innerHTML = `
+                <div class="ensemble-badge ${ensIsFake ? 'badge-fake' : 'badge-real'}">
+                    ${data.ensemble.label.toUpperCase()}
+                </div>
+                <div class="ensemble-conf">${data.ensemble.confidence}% avg confidence</div>
+            `;
+
+            const votesEl = document.getElementById('modelVotes');
+            votesEl.innerHTML = '';
+            for (const [mname, mpred] of Object.entries(data.all_predictions)) {
+                const mIsFake = mpred.label === 'Fake';
+                votesEl.innerHTML += `
+                    <div class="vote-chip ${mIsFake ? 'chip-fake' : 'chip-real'}">
+                        <span class="vote-dot"></span>
+                        ${mname.split(' ').map(w => w[0]).join('')}: ${mpred.label}
+                    </div>
+                `;
+            }
+
+            // ── Model Comparison ──
+            const compEl = document.getElementById('modelComparison');
+            compEl.innerHTML = '';
+            for (const [mname, mpred] of Object.entries(data.all_predictions)) {
+                const mIsFake = mpred.label === 'Fake';
+                compEl.innerHTML += `
+                    <div class="model-comp-item">
+                        <div class="comp-header">
+                            <span class="comp-name">${mname}</span>
+                            <span class="comp-badge ${mIsFake ? 'badge-fake' : 'badge-real'}">${mpred.label}</span>
+                        </div>
+                        <div class="comp-bars">
+                            <div class="comp-bar-row">
+                                <span class="comp-bar-label">F</span>
+                                <div class="bar-track small">
+                                    <div class="bar-fill fake" style="width: ${mpred.fake_prob}%"></div>
+                                </div>
+                                <span class="comp-bar-val">${mpred.fake_prob}%</span>
+                            </div>
+                            <div class="comp-bar-row">
+                                <span class="comp-bar-label">R</span>
+                                <div class="bar-track small">
+                                    <div class="bar-fill real" style="width: ${mpred.real_prob}%"></div>
+                                </div>
+                                <span class="comp-bar-val">${mpred.real_prob}%</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // ── LIME ──
+            const limeEl = document.getElementById('limeChart');
+            if (data.lime_explanation && data.lime_explanation.length > 0) {
+                const maxWeight = Math.max(...data.lime_explanation.map(d => Math.abs(d.weight)));
+                limeEl.innerHTML = data.lime_explanation.map(item => {
+                    const pct = Math.abs(item.weight) / maxWeight * 100;
+                    const isPositive = item.weight > 0;
+                    return `
+                        <div class="lime-row">
+                            <span class="lime-word">${item.word}</span>
+                            <div class="lime-bar-container">
+                                <div class="lime-bar ${isPositive ? 'lime-real' : 'lime-fake'}"
+                                     style="width: ${pct}%"></div>
+                            </div>
+                            <span class="lime-weight ${isPositive ? 'weight-real' : 'weight-fake'}">
+                                ${item.weight > 0 ? '+' : ''}${item.weight.toFixed(4)}
+                            </span>
+                        </div>
+                    `;
+                }).join('');
+            } else {
+                limeEl.innerHTML = '<p class="no-data">No explanation data available.</p>';
+            }
+
+            // ── Word clouds (Fake vs Real from LIME) — varied colors + interactive hover ──
+            const containerFake = document.getElementById('wordcloudFake');
+            const containerReal = document.getElementById('wordcloudReal');
+            containerFake.innerHTML = '';
+            containerReal.innerHTML = '';
+            if (typeof WordCloud !== 'undefined' && data.lime_explanation && data.lime_explanation.length > 0) {
+                const maxWeight = Math.max(...data.lime_explanation.map(d => Math.abs(d.weight)), 0.001);
+                const fakeItems = data.lime_explanation.filter(d => d.weight < 0).map(d => [d.word, 8 + 32 * (Math.abs(d.weight) / maxWeight)]);
+                const realItems = data.lime_explanation.filter(d => d.weight > 0).map(d => [d.word, 8 + 32 * (Math.abs(d.weight) / maxWeight)]);
+
+                const fakePalette = ['#ef4444', '#f87171', '#fb7185', '#f97316', '#fb923c', '#dc2626', '#e11d48', '#b91c1c', '#f43f5e', '#ea580c'];
+                const realPalette = ['#22c55e', '#4ade80', '#2dd4bf', '#14b8a6', '#10b981', '#059669', '#34d399', '#0d9488', '#5eead4', '#6ee7b7'];
+                let fakeColorIdx = 0, realColorIdx = 0;
+                const colorFake = function(word, weight, fontSize) { return fakePalette[fakeColorIdx++ % fakePalette.length]; };
+                const colorReal = function(word, weight, fontSize) { return realPalette[realColorIdx++ % realPalette.length]; };
+
+                const wcOpts = { gridSize: 10, weightFactor: 1, fontFamily: 'Inter, sans-serif', fontWeight: '600', minSize: 0 };
+                if (fakeItems.length > 0) {
+                    WordCloud(containerFake, Object.assign({}, wcOpts, { list: fakeItems, color: colorFake }));
+                }
+                if (realItems.length > 0) {
+                    WordCloud(containerReal, Object.assign({}, wcOpts, { list: realItems, color: colorReal }));
+                }
+            }
+
+            results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        textarea.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'Enter') analyze();
+        });
+    </script>
+</body>
+</html>

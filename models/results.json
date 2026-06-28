@@ -1,0 +1,23 @@
+{
+  "Logistic Regression": {
+    "accuracy": 0.9914,
+    "precision": 0.9884,
+    "recall": 0.9937,
+    "f1_score": 0.991,
+    "roc_auc": 0.9995
+  },
+  "Multinomial Naive Bayes": {
+    "accuracy": 0.9652,
+    "precision": 0.964,
+    "recall": 0.9631,
+    "f1_score": 0.9636,
+    "roc_auc": 0.9933
+  },
+  "Passive Aggressive Classifier": {
+    "accuracy": 0.9965,
+    "precision": 0.9951,
+    "recall": 0.9977,
+    "f1_score": 0.9964,
+    "roc_auc": 0.9999
+  }
+}
