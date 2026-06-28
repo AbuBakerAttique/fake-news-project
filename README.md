@@ -5,6 +5,7 @@ An explainable web application that classifies news text as **Fake** or **Real**
 ## Features
 
 - Flask web interface for submitting and analyzing news articles.
+- Streamlit app entrypoint for simple cloud deployment.
 - Three classical ML classifiers: Logistic Regression, Multinomial Naive Bayes, and Passive Aggressive Classifier.
 - TF-IDF preprocessing pipeline with stopword removal and lemmatization.
 - Combined verdict with individual model comparison.
@@ -15,6 +16,7 @@ An explainable web application that classifies news text as **Fake** or **Real**
 ## Tech Stack
 
 - Python, Flask
+- Streamlit
 - scikit-learn, NLTK, LIME
 - HTML, CSS, JavaScript
 - wordcloud2.js
@@ -25,6 +27,7 @@ An explainable web application that classifies news text as **Fake** or **Real**
 ```text
 .
 ├── app.py
+├── streamlit_app.py
 ├── train.py
 ├── requirements.txt
 ├── run.bat
@@ -100,6 +103,8 @@ The repository includes the exploratory analysis notebook and saved model result
 
 ## Run
 
+Run the Flask app:
+
 ```bash
 python app.py
 ```
@@ -109,6 +114,22 @@ Open:
 ```text
 http://127.0.0.1:5002
 ```
+
+Run the Streamlit app:
+
+```bash
+streamlit run streamlit_app.py
+```
+
+## Deploy on Streamlit Cloud
+
+Use these settings when creating the app on Streamlit Community Cloud:
+
+- Repository: `AbuBakerAttique/fake-news-project`
+- Branch: `main`
+- Main file path: `streamlit_app.py`
+
+The app needs the trained `.joblib` files in `models/` to make live predictions. If they are not present, the Streamlit page still opens and shows the EDA/model result images, but prediction is disabled until the model artifacts are available.
 
 ## API
 
