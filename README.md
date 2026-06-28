@@ -65,6 +65,12 @@ Install dependencies:
 pip install -r requirements.txt
 ```
 
+For the Flask app or local model training, also install:
+
+```bash
+pip install flask lime matplotlib seaborn kagglehub
+```
+
 ## Train Models
 
 ```bash
