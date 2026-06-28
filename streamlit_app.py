@@ -27,6 +27,142 @@ st.set_page_config(
 )
 
 
+def inject_styles():
+    st.markdown(
+        """
+        <style>
+        .main .block-container {
+            max-width: 1180px;
+            padding-top: 2rem;
+            padding-bottom: 3rem;
+        }
+        h1, h2, h3 {
+            letter-spacing: 0;
+        }
+        .hero {
+            border: 1px solid #e6e8ef;
+            border-radius: 8px;
+            padding: 28px 30px;
+            background: linear-gradient(135deg, #f8fafc 0%, #eef6ff 100%);
+            margin-bottom: 22px;
+        }
+        .hero-title {
+            font-size: 42px;
+            line-height: 1.1;
+            font-weight: 760;
+            color: #111827;
+            margin-bottom: 10px;
+        }
+        .hero-copy {
+            font-size: 16px;
+            color: #4b5563;
+            max-width: 760px;
+            margin-bottom: 18px;
+        }
+        .pill-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .pill {
+            border: 1px solid #dbe4f0;
+            background: #ffffff;
+            border-radius: 999px;
+            padding: 7px 11px;
+            color: #374151;
+            font-size: 13px;
+            font-weight: 650;
+        }
+        .panel {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: #ffffff;
+            padding: 18px;
+            min-height: 118px;
+        }
+        .panel-label {
+            color: #6b7280;
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+        .panel-value {
+            color: #111827;
+            font-size: 30px;
+            font-weight: 760;
+            line-height: 1.15;
+            margin-bottom: 4px;
+        }
+        .panel-help {
+            color: #6b7280;
+            font-size: 13px;
+        }
+        .verdict-real {
+            border-left: 5px solid #059669;
+        }
+        .verdict-fake {
+            border-left: 5px solid #dc2626;
+        }
+        .soft-note {
+            border: 1px solid #dbeafe;
+            border-radius: 8px;
+            background: #eff6ff;
+            padding: 14px 16px;
+            color: #1e3a8a;
+            font-size: 14px;
+        }
+        .missing-note {
+            border: 1px solid #fde68a;
+            border-radius: 8px;
+            background: #fffbeb;
+            padding: 14px 16px;
+            color: #92400e;
+            font-size: 14px;
+            margin-bottom: 14px;
+        }
+        div[data-testid="stMetric"] {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 14px 16px;
+            background: #ffffff;
+        }
+        div[data-testid="stTextArea"] textarea {
+            border-radius: 8px;
+        }
+        .stButton > button {
+            border-radius: 8px;
+            min-height: 44px;
+            font-weight: 700;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_header():
+    st.markdown(
+        """
+        <div class="hero">
+            <div class="hero-title">Fake News Detector</div>
+            <div class="hero-copy">
+                Analyze news text with trained TF-IDF classifiers, compare model votes,
+                and inspect statistical writing-style signals from one focused dashboard.
+            </div>
+            <div class="pill-row">
+                <span class="pill">TF-IDF</span>
+                <span class="pill">Logistic Regression</span>
+                <span class="pill">Naive Bayes</span>
+                <span class="pill">Passive Aggressive</span>
+                <span class="pill">Writing-style analysis</span>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 @st.cache_resource(show_spinner=False)
 def get_nltk_tools():
     nltk.download("stopwords", quiet=True)
@@ -229,105 +365,207 @@ def predict_article(text, model_name, tfidf, models):
     }
 
 
-def show_model_results(results):
-    st.subheader("Model Results")
+def render_probability(label, value):
+    st.write(f"**{label}: {value}%**")
+    st.progress(int(round(value)))
 
-    if results:
-        metrics = pd.DataFrame(results).T
-        st.dataframe(metrics, use_container_width=True)
 
-    col1, col2, col3 = st.columns(3)
+def render_verdict_panel(title, label, confidence):
+    positive_labels = {"Real", "Human-style"}
+    verdict_class = "verdict-real" if label in positive_labels else "verdict-fake"
+    st.markdown(
+        f"""
+        <div class="panel {verdict_class}">
+            <div class="panel-label">{title}</div>
+            <div class="panel-value">{label}</div>
+            <div class="panel-help">{confidence}% confidence</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def show_prediction_results(result):
+    st.subheader("Analysis Result")
+
+    col1, col2, col3 = st.columns([1.2, 1, 1])
     with col1:
-        st.image(
-            "models/cm_logistic_regression.png",
-            caption="Logistic Regression",
-            use_container_width=True,
-        )
+        render_verdict_panel("Primary Verdict", result["label"], result["confidence"])
     with col2:
-        st.image(
-            "models/cm_multinomial_naive_bayes.png",
-            caption="Multinomial Naive Bayes",
-            use_container_width=True,
+        render_verdict_panel(
+            "Ensemble Vote",
+            result["ensemble"]["label"],
+            result["ensemble"]["confidence"],
         )
     with col3:
-        st.image(
-            "models/cm_passive_aggressive_classifier.png",
-            caption="Passive Aggressive Classifier",
-            use_container_width=True,
-        )
+        ai_detection = result["ai_detection"]
+        if ai_detection:
+            ai_label = "AI-style" if ai_detection["ai_probability"] >= 45 else "Human-style"
+            ai_conf = max(
+                ai_detection["ai_probability"],
+                ai_detection["human_probability"],
+            )
+            render_verdict_panel("Writing Style", ai_label, ai_conf)
+        else:
+            st.markdown(
+                """
+                <div class="panel">
+                    <div class="panel-label">Writing Style</div>
+                    <div class="panel-value">Needs More Text</div>
+                    <div class="panel-help">Paste a longer article for statistical signals</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    st.markdown("#### Probability Breakdown")
+    prob_col1, prob_col2 = st.columns(2)
+    with prob_col1:
+        render_probability("Fake probability", result["fake_probability"])
+    with prob_col2:
+        render_probability("Real probability", result["real_probability"])
+
+    comparison = pd.DataFrame(result["all_predictions"]).T
+    comparison = comparison[
+        ["label", "confidence", "fake_probability", "real_probability"]
+    ]
+    comparison.columns = ["Label", "Confidence", "Fake %", "Real %"]
+
+    tab_models, tab_style = st.tabs(["Model comparison", "Writing-style signals"])
+    with tab_models:
+        st.dataframe(comparison, use_container_width=True)
+
+    with tab_style:
+        ai_detection = result["ai_detection"]
+        if not ai_detection:
+            st.info("Writing-style analysis needs at least 20 words and 2 sentences.")
+        else:
+            style_col1, style_col2 = st.columns(2)
+            with style_col1:
+                st.metric("AI-style probability", f"{ai_detection['ai_probability']}%")
+            with style_col2:
+                st.metric("Human-style probability", f"{ai_detection['human_probability']}%")
+
+            feature_rows = [
+                {
+                    "Indicator": key.replace("_", " ").title(),
+                    "Score": value,
+                }
+                for key, value in ai_detection["features"].items()
+            ]
+            st.dataframe(pd.DataFrame(feature_rows), use_container_width=True)
+
+
+def show_model_results(results):
+    st.subheader("Training Results")
+
+    tab_metrics, tab_matrices = st.tabs(["Metrics", "Confusion matrices"])
+
+    with tab_metrics:
+        if results:
+            metrics = pd.DataFrame(results).T
+            metrics.index.name = "Model"
+            st.dataframe(metrics, use_container_width=True)
+        else:
+            st.info("Model metrics are not available yet.")
+
+    with tab_matrices:
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.image(
+                "models/cm_logistic_regression.png",
+                caption="Logistic Regression",
+                use_container_width=True,
+            )
+        with col2:
+            st.image(
+                "models/cm_multinomial_naive_bayes.png",
+                caption="Multinomial Naive Bayes",
+                use_container_width=True,
+            )
+        with col3:
+            st.image(
+                "models/cm_passive_aggressive_classifier.png",
+                caption="Passive Aggressive Classifier",
+                use_container_width=True,
+            )
 
 
 def main():
-    st.title("Fake News Detector")
-    st.caption("Explainable TF-IDF classification with statistical writing-style analysis")
+    inject_styles()
+    render_header()
 
     tfidf, models, results = load_model_artifacts()
     models_loaded = tfidf is not None and bool(models)
 
     if not models_loaded:
-        st.warning("Live prediction is waiting for trained model files.")
-        st.info(
-            "The app is deployed correctly. Add the `.joblib` files to `models/` "
-            "when you want prediction enabled."
+        st.markdown(
+            """
+            <div class="missing-note">
+                Live prediction is waiting for trained model files.
+            </div>
+            <div class="soft-note">
+                The app is deployed correctly. Add the `.joblib` files to `models/`
+                when you want prediction enabled.
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
         show_model_results(results)
         return
 
     with st.sidebar:
-        st.header("Analysis Settings")
+        st.header("Settings")
         selected_model = st.selectbox("Primary model", list(models.keys()))
+        st.caption("Primary model controls the headline prediction. The ensemble still compares all models.")
+        st.divider()
+        st.metric("Loaded models", len(models))
+        st.metric("Feature vectorizer", "Ready")
+        st.divider()
         st.markdown(
             "[Open EDA notebook](https://github.com/AbuBakerAttique/fake-news-project/blob/main/eda.ipynb)"
         )
 
-    article_text = st.text_area(
-        "Paste a news article",
-        height=240,
-        placeholder="Paste the full news article text here...",
-    )
+    input_col, guide_col = st.columns([2.1, 1])
+    with input_col:
+        st.subheader("Article Input")
+        article_text = st.text_area(
+            "Paste a news article",
+            height=260,
+            placeholder="Paste the full news article text here...",
+            label_visibility="collapsed",
+        )
+        analyze_clicked = st.button("Analyze Article", type="primary", use_container_width=True)
 
-    if st.button("Analyze Article", type="primary"):
+    with guide_col:
+        st.subheader("What You Get")
+        st.markdown(
+            """
+            <div class="soft-note">
+                The app returns the primary verdict, ensemble vote, model-by-model
+                probabilities, and writing-style indicators.
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.caption("For best results, paste the full article body rather than only a headline.")
+
+    if analyze_clicked:
         if not article_text.strip():
             st.warning("Please paste an article before analyzing.")
         else:
-            result = predict_article(article_text.strip(), selected_model, tfidf, models)
-
-            verdict_col, fake_col, real_col = st.columns(3)
-            verdict_col.metric(
-                "Primary verdict",
-                result["label"],
-                f"{result['confidence']}% confidence",
-            )
-            fake_col.metric("Fake probability", f"{result['fake_probability']}%")
-            real_col.metric("Real probability", f"{result['real_probability']}%")
-
-            st.subheader("Ensemble Verdict")
-            st.metric(
-                "Majority vote",
-                result["ensemble"]["label"],
-                f"{result['ensemble']['confidence']}% average confidence",
-            )
-
-            comparison = pd.DataFrame(result["all_predictions"]).T
-            st.subheader("Model Comparison")
-            st.dataframe(comparison, use_container_width=True)
-
-            ai_detection = result["ai_detection"]
-            if ai_detection:
-                st.subheader("Statistical Writing-Style Analysis")
-                ai_col, human_col = st.columns(2)
-                ai_col.metric("AI-style probability", f"{ai_detection['ai_probability']}%")
-                human_col.metric(
-                    "Human-style probability",
-                    f"{ai_detection['human_probability']}%",
-                )
-                st.dataframe(
-                    pd.DataFrame(
-                        ai_detection["features"].items(),
-                        columns=["Indicator", "Score"],
-                    ),
-                    use_container_width=True,
-                )
+            with st.spinner("Analyzing article..."):
+                result = predict_article(article_text.strip(), selected_model, tfidf, models)
+            show_prediction_results(result)
+    else:
+        st.markdown(
+            """
+            <div class="soft-note">
+                Paste an article and run analysis to see predictions here.
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
     st.divider()
     show_model_results(results)
