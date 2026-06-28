@@ -79,6 +79,25 @@ Training creates:
 - `models/results.json`
 - confusion matrix images
 
+## EDA and Model Results
+
+The repository includes the exploratory analysis notebook and saved model result images:
+
+- [Exploratory Data Analysis notebook](eda.ipynb)
+- [Model metrics JSON](models/results.json)
+
+### Logistic Regression
+
+![Logistic Regression confusion matrix](models/cm_logistic_regression.png)
+
+### Multinomial Naive Bayes
+
+![Multinomial Naive Bayes confusion matrix](models/cm_multinomial_naive_bayes.png)
+
+### Passive Aggressive Classifier
+
+![Passive Aggressive Classifier confusion matrix](models/cm_passive_aggressive_classifier.png)
+
 ## Run
 
 ```bash
