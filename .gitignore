@@ -12,6 +12,10 @@ data/
 
 models/*.joblib
 models/*.pkl
+!models/tfidf_vectorizer.joblib
+!models/logistic_regression.joblib
+!models/multinomial_naive_bayes.joblib
+!models/passive_aggressive_classifier.joblib
 
 *.doc
 *.docx
